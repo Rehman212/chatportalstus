@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+:root {
+  --stus-primary: #013f92;
+  --stus-primary-hover: #012f70;
+  --stus-primary-soft: #0254b3;
+  --stus-dark: #2f403a;
+  --stus-dark-hover: #1e2a26;
+  --stus-muted: #5a6b65;
+  --stus-light-blue: #c6dbf0;
+  --stus-lavender: #c2b6de;
+  --stus-lime: #c7d66d;
+  --stus-background: #f6f9fc;
+  --stus-white: #ffffff;
+  --stus-text: #17231f;
+  --stus-border: #d9e5ef;
+  --status-online: #16a34a;
+  --status-away: #f99c00;
+  --status-offline: #64748b;
+  --status-error: #e40014;
+}
+
+@theme inline {
+  --color-background: var(--stus-background);
+  --color-foreground: var(--stus-text);
+  --color-primary: var(--stus-primary);
+  --color-primary-hover: var(--stus-primary-hover);
+  --color-primary-soft: var(--stus-primary-soft);
+  --color-stus-dark: var(--stus-dark);
+  --color-stus-muted: var(--stus-muted);
+  --color-stus-border: var(--stus-border);
+  --color-stus-blue-light: var(--stus-light-blue);
+  --color-stus-lavender: var(--stus-lavender);
+  --color-stus-lime: var(--stus-lime);
+  --font-sans: var(--font-poppins), Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--stus-background);
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 12% 0%, rgb(198 219 240 / 0.34), transparent 28rem),
+    linear-gradient(145deg, #fbfcfd 0%, #f4f8fc 100%);
+  color: var(--stus-text);
+  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgb(1 63 146 / 0.22);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--stus-light-blue);
+  color: var(--stus-dark);
+}
+
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #a7bac9;
+  background-clip: padding-box;
+}
+
+.surface-shadow {
+  box-shadow: 0 10px 35px rgb(38 67 94 / 0.08);
+}
+
+.soft-grid {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.truncate-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
