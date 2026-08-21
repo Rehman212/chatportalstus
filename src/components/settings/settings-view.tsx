@@ -5,6 +5,7 @@ import {
   Bell,
   Check,
   MessageSquareText,
+  Play,
   Route,
   Shield,
   Timer,
@@ -12,8 +13,17 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/portal-shell";
 import { Avatar, Button, Card } from "@/components/ui";
+import {
+  previewSound,
+  RECEIVE_SOUND_OPTIONS,
+  SEND_SOUND_OPTIONS,
+  TYPING_SOUND_OPTIONS,
+  type ReceiveSoundId,
+  type SendSoundId,
+  type TypingSoundId,
+} from "@/lib/sounds";
 import { cn } from "@/lib/utils";
-import { usePortalStore } from "@/stores/portal-store";
+import { usePortalStore, defaultSettings } from "@/stores/portal-store";
 import type { PortalSettings, Priority } from "@/types";
 
 const sections = [
@@ -90,7 +100,10 @@ export function SettingsView() {
   const setAvailability = usePortalStore((state) => state.setAvailability);
   const updateSettings = usePortalStore((state) => state.updateSettings);
   const [section, setSection] = useState<SectionId>("profile");
-  const [draft, setDraft] = useState<PortalSettings>(settings);
+  const [draft, setDraft] = useState<PortalSettings>({
+    ...defaultSettings,
+    ...settings,
+  });
   const [saved, setSaved] = useState(false);
 
   const patch = <K extends keyof PortalSettings>(
@@ -222,34 +235,129 @@ export function SettingsView() {
           )}
 
           {section === "notifications" && (
-            <Card className="divide-y divide-[#eef2f7] px-5 py-2 sm:px-6">
-              <div className="py-4">
+            <div className="space-y-5">
+              <Card className="divide-y divide-[#eef2f7] px-5 py-2 sm:px-6">
+                <div className="py-4">
+                  <h2 className="text-[15px] font-bold text-[#0a275f]">
+                    Notification preferences
+                  </h2>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    Control how you get alerted for new requests and messages
+                  </p>
+                </div>
+                <Toggle
+                  checked={draft.soundNotifications}
+                  onChange={(v) => patch("soundNotifications", v)}
+                  label="Sound alerts"
+                  description="Master switch for send, receive, and typing sounds"
+                />
+                <Toggle
+                  checked={draft.desktopNotifications}
+                  onChange={(v) => patch("desktopNotifications", v)}
+                  label="Desktop notifications"
+                  description="Show browser notifications while the portal is open"
+                />
+                <Toggle
+                  checked={draft.emailDigest}
+                  onChange={(v) => patch("emailDigest", v)}
+                  label="Daily email digest"
+                  description="Receive a morning summary of queue health and unresolved chats"
+                />
+              </Card>
+
+              <Card className="p-5 sm:p-6">
                 <h2 className="text-[15px] font-bold text-[#0a275f]">
-                  Notification preferences
+                  Message sounds
                 </h2>
                 <p className="mt-1 text-[12px] text-slate-500">
-                  Control how you get alerted for new requests and messages
+                  Dropdown se sound choose karo, Play se suno, phir Save changes
+                  dabao
                 </p>
-              </div>
-              <Toggle
-                checked={draft.soundNotifications}
-                onChange={(v) => patch("soundNotifications", v)}
-                label="Sound alerts"
-                description="Play a short sound when a new chat request arrives"
-              />
-              <Toggle
-                checked={draft.desktopNotifications}
-                onChange={(v) => patch("desktopNotifications", v)}
-                label="Desktop notifications"
-                description="Show browser notifications while the portal is open"
-              />
-              <Toggle
-                checked={draft.emailDigest}
-                onChange={(v) => patch("emailDigest", v)}
-                label="Daily email digest"
-                description="Receive a morning summary of queue health and unresolved chats"
-              />
-            </Card>
+
+                <div className="mt-5 space-y-4">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <Field label="Send message sound">
+                      <select
+                        className={inputClass}
+                        value={draft.sendSound}
+                        onChange={(e) =>
+                          patch("sendSound", e.target.value as SendSoundId)
+                        }
+                      >
+                        {SEND_SOUND_OPTIONS.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <button
+                      type="button"
+                      onClick={() => previewSound("send", draft.sendSound)}
+                      className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2eaf3] bg-white px-4 text-[12px] font-semibold text-[#0a275f] hover:bg-[#f7f9fc]"
+                    >
+                      <Play size={14} /> Play
+                    </button>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <Field label="New message received sound">
+                      <select
+                        className={inputClass}
+                        value={draft.receiveSound}
+                        onChange={(e) =>
+                          patch("receiveSound", e.target.value as ReceiveSoundId)
+                        }
+                      >
+                        {RECEIVE_SOUND_OPTIONS.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <button
+                      type="button"
+                      onClick={() => previewSound("receive", draft.receiveSound)}
+                      className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2eaf3] bg-white px-4 text-[12px] font-semibold text-[#0a275f] hover:bg-[#f7f9fc]"
+                    >
+                      <Play size={14} /> Play
+                    </button>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <Field label="Typing sound">
+                      <select
+                        className={inputClass}
+                        value={draft.typingSound}
+                        onChange={(e) =>
+                          patch("typingSound", e.target.value as TypingSoundId)
+                        }
+                      >
+                        {TYPING_SOUND_OPTIONS.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <button
+                      type="button"
+                      disabled={draft.typingSound === "off"}
+                      onClick={() => previewSound("typing", draft.typingSound)}
+                      className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#e2eaf3] bg-white px-4 text-[12px] font-semibold text-[#0a275f] hover:bg-[#f7f9fc] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Play size={14} /> Play
+                    </button>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-[11px] text-slate-400">
+                  Sound alerts toggle ON hona chahiye. Select → Play → Save
+                  changes.
+                </p>
+              </Card>
+            </div>
           )}
 
           {section === "chat" && (

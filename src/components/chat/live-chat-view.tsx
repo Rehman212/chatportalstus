@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { Avatar, Badge, Button, Dialog, EmptyState } from "@/components/ui";
 import { agents } from "@/lib/mock-data";
+import { playSendSound, playTypingSound, unlockAudio } from "@/lib/sounds";
 import { cn, formatTime } from "@/lib/utils";
 import { usePortalStore } from "@/stores/portal-store";
 import type {
@@ -629,6 +630,18 @@ export function LiveChatView({ selectedId }: { selectedId?: string }) {
   const setPriority = usePortalStore((state) => state.setPriority);
   const setStatus = usePortalStore((state) => state.setStatus);
   const sendMessage = usePortalStore((state) => state.sendMessage);
+  const receiveCustomerReply = usePortalStore(
+    (state) => state.receiveCustomerReply,
+  );
+  const soundOn = usePortalStore(
+    (state) => state.settings.soundNotifications !== false,
+  );
+  const sendSound = usePortalStore(
+    (state) => state.settings.sendSound ?? "whatsapp",
+  );
+  const typingSound = usePortalStore(
+    (state) => state.settings.typingSound ?? "off",
+  );
   const closeConversation = usePortalStore((state) => state.closeConversation);
   const markRead = usePortalStore((state) => state.markConversationRead);
   const active = conversations.filter((item) =>
@@ -670,19 +683,24 @@ export function LiveChatView({ selectedId }: { selectedId?: string }) {
     );
   }
 
-  const clearPending = () => {
-    if (pendingFile?.url) URL.revokeObjectURL(pendingFile.url);
-    setPendingFile(null);
-  };
-
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const value = body.trim();
     if (!value && !pendingFile) return;
+    void unlockAudio();
+    playSendSound(soundOn, sendSound);
     sendMessage(conversation.id, value, pendingFile || undefined);
     setBody("");
     setPendingFile(null);
     setEmojiOpen(false);
+    window.setTimeout(() => {
+      receiveCustomerReply(conversation.id);
+    }, 2200);
+  };
+
+  const clearPending = () => {
+    if (pendingFile?.url) URL.revokeObjectURL(pendingFile.url);
+    setPendingFile(null);
   };
 
   const onPickFile = (file: File) => {
@@ -716,12 +734,17 @@ export function LiveChatView({ selectedId }: { selectedId?: string }) {
     const duration = Math.max(recordSec, 1);
     setRecording(false);
     setRecordSec(0);
+    void unlockAudio();
+    playSendSound(soundOn, sendSound);
     sendMessage(conversation.id, "", {
       name: "Voice message",
       size: `${duration}s`,
       type: "voice",
       durationSec: duration,
     });
+    window.setTimeout(() => {
+      receiveCustomerReply(conversation.id, "Got your voice note, thank you!");
+    }, 2500);
   };
 
   return (
@@ -989,6 +1012,13 @@ export function LiveChatView({ selectedId }: { selectedId?: string }) {
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
                     onKeyDown={(event) => {
+                      if (
+                        event.key.length === 1 ||
+                        event.key === "Backspace" ||
+                        event.key === "Enter"
+                      ) {
+                        playTypingSound(soundOn, typingSound);
+                      }
                       if (event.key === "Enter" && !event.shiftKey) {
                         event.preventDefault();
                         event.currentTarget.form?.requestSubmit();

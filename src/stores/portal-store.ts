@@ -23,6 +23,9 @@ export const defaultSettings: PortalSettings = {
   language: "English",
   timezone: "Asia/Karachi (PKT)",
   soundNotifications: true,
+  sendSound: "whatsapp",
+  receiveSound: "ping",
+  typingSound: "off",
   desktopNotifications: true,
   emailDigest: false,
   autoAssignEnabled: true,
@@ -51,6 +54,7 @@ interface PortalState {
   setPriority: (id: string, priority: Priority) => void;
   setStatus: (id: string, status: ConversationStatus) => void;
   sendMessage: (id: string, body: string, attachment?: MessageAttachment) => void;
+  receiveCustomerReply: (id: string, body?: string) => void;
   retryMessage: (conversationId: string, messageId: string) => void;
   addNote: (id: string, body: string) => void;
   closeConversation: (id: string, note?: string) => void;
@@ -190,6 +194,55 @@ export const usePortalStore = create<PortalState>()(
           }));
         }, 650);
       },
+      receiveCustomerReply: (id, body) => {
+        const reply =
+          body ||
+          "Thanks — I just checked again. Could you please confirm on your side?";
+        set((state) => {
+          const conversation = state.conversations.find((item) => item.id === id);
+          if (!conversation) return state;
+          const messageId = `incoming-${Date.now()}`;
+          return {
+            conversations: updateConversation(
+              state.conversations,
+              id,
+              (item) => ({
+                ...item,
+                unread: item.unread + 1,
+                updatedAt: new Date().toISOString(),
+                status:
+                  item.status === "Waiting for Agent" || item.status === "Active"
+                    ? "Waiting for Agent"
+                    : item.status,
+                messages: [
+                  ...item.messages,
+                  {
+                    id: messageId,
+                    conversationId: id,
+                    sender: item.customer.name,
+                    kind: "customer" as const,
+                    body: reply,
+                    createdAt: new Date().toISOString(),
+                    delivery: "sent" as const,
+                  },
+                ],
+              }),
+            ),
+            notifications: [
+              {
+                id: `notif-${Date.now()}`,
+                type: "message" as const,
+                title: `New message from ${conversation.customer.name}`,
+                detail: reply,
+                conversationId: id,
+                createdAt: new Date().toISOString(),
+                read: false,
+              },
+              ...state.notifications,
+            ],
+          };
+        });
+      },
       retryMessage: (conversationId, messageId) => {
         set((state) => ({
           conversations: updateConversation(
@@ -323,6 +376,17 @@ export const usePortalStore = create<PortalState>()(
         settings: state.settings,
         userName: state.userName,
       }),
+      merge: (persisted, current) => {
+        const stored = (persisted || {}) as Partial<PortalState>;
+        return {
+          ...current,
+          ...stored,
+          settings: {
+            ...defaultSettings,
+            ...(stored.settings || {}),
+          },
+        };
+      },
     },
   ),
 );

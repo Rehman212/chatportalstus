@@ -4,13 +4,17 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   ArrowRight,
+  Bot,
   Check,
+  ChevronDown,
   Clock3,
   Eye,
-  Filter,
+  Inbox,
   Search,
   UserPlus,
+  Users,
   X,
+  Zap,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/portal-shell";
 import {
@@ -20,9 +24,9 @@ import {
   Card,
   Dialog,
   EmptyState,
-  Input,
 } from "@/components/ui";
-import { formatTime, relativeTime } from "@/lib/utils";
+import { agents } from "@/lib/mock-data";
+import { cn, formatTime, relativeTime } from "@/lib/utils";
 import { usePortalStore } from "@/stores/portal-store";
 import type { Conversation, Priority, UserType } from "@/types";
 
@@ -34,6 +38,51 @@ const priorityTone = (priority: Priority) =>
       : priority === "Medium"
         ? "blue"
         : "neutral";
+
+const priorityBar = (priority: Priority) =>
+  priority === "Urgent"
+    ? "bg-red-500"
+    : priority === "High"
+      ? "bg-amber-500"
+      : priority === "Medium"
+        ? "bg-[#0254b3]"
+        : "bg-slate-300";
+
+function PrioritySelect({
+  value,
+  onChange,
+  id,
+}: {
+  value: Priority;
+  onChange: (value: Priority) => void;
+  id: string;
+}) {
+  return (
+    <label className="relative inline-flex">
+      <span className="sr-only">Priority for {id}</span>
+      <span
+        className={cn(
+          "pointer-events-none absolute left-2.5 top-1/2 size-1.5 -translate-y-1/2 rounded-full",
+          priorityBar(value),
+        )}
+      />
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value as Priority)}
+        className="h-8 cursor-pointer appearance-none rounded-md border border-[#e2eaf3] bg-white py-0 pl-6 pr-7 text-[11px] font-semibold text-[#0a275f] outline-none hover:border-[#b8c9dc] focus:border-[#013f92]/35 focus:ring-2 focus:ring-[#013f92]/10"
+      >
+        <option>Urgent</option>
+        <option>High</option>
+        <option>Medium</option>
+        <option>Low</option>
+      </select>
+      <ChevronDown
+        size={12}
+        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+      />
+    </label>
+  );
+}
 
 export function QueueView({
   mode,
@@ -62,35 +111,57 @@ export function QueueView({
       !["Closed", "Resolved", "Rejected"].includes(conversation.status)
     );
   });
+
   const filtered = useMemo(
     () =>
-      base.filter((conversation) => {
-        const matchesQuery = `${conversation.id} ${conversation.customer.name} ${conversation.customer.email} ${conversation.customer.company}`
-          .toLowerCase()
-          .includes(query.toLowerCase());
-        return (
-          matchesQuery &&
-          (type === "All" || conversation.customer.type === type) &&
-          (priority === "All" || conversation.priority === priority)
-        );
-      }),
+      base
+        .filter((conversation) => {
+          const matchesQuery =
+            `${conversation.id} ${conversation.customer.name} ${conversation.customer.email} ${conversation.customer.company}`
+              .toLowerCase()
+              .includes(query.toLowerCase());
+          return (
+            matchesQuery &&
+            (type === "All" || conversation.customer.type === type) &&
+            (priority === "All" || conversation.priority === priority)
+          );
+        })
+        .sort((a, b) => {
+          const rank = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
+          const byPriority = rank[a.priority] - rank[b.priority];
+          if (byPriority !== 0) return byPriority;
+          return (
+            new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime()
+          );
+        }),
     [base, priority, query, type],
   );
+
+  const stats = useMemo(() => {
+    const urgent = base.filter((c) => c.priority === "Urgent").length;
+    const high = base.filter((c) => c.priority === "High").length;
+    const buyers = base.filter((c) => c.customer.type === "Buyer").length;
+    const suppliers = base.filter((c) => c.customer.type === "Supplier").length;
+    return { urgent, high, buyers, suppliers, total: base.length };
+  }, [base]);
+
   const copy = {
     requests: {
       eyebrow: "Incoming queue",
       title: "Chat requests",
-      description: "Review chatbot context, prioritize urgent needs and connect customers with the right agent.",
+      description:
+        "Triage new chatbot handoffs by urgency, review context, then accept or assign to the right agent.",
     },
     assigned: {
       eyebrow: "My workspace",
       title: "Assigned chats",
-      description: "Conversations currently assigned to you across active and waiting states.",
+      description:
+        "Conversations currently owned by you across active and waiting states.",
     },
     unassigned: {
       eyebrow: "Team queue",
       title: "Unassigned chats",
-      description: "Conversations that still need an owner.",
+      description: "Open conversations that still need an owner before work can continue.",
     },
   }[mode];
 
@@ -98,47 +169,115 @@ export function QueueView({
     <div className="w-full p-4 sm:p-5 lg:p-6">
       <PageHeader
         {...copy}
-        action={<Badge tone="blue">{base.length} conversations</Badge>}
+        action={
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-[#eef4ff] px-3 py-1.5 text-[12px] font-bold text-[#013f92]">
+              {filtered.length} showing
+            </span>
+            <span className="hidden rounded-full bg-[#f1f5f9] px-3 py-1.5 text-[12px] font-semibold text-slate-500 sm:inline">
+              {stats.total} in queue
+            </span>
+          </div>
+        }
       />
-      <Card className="mt-7 overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-stus-border p-4 lg:flex-row lg:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-3.5 text-slate-400" size={17} />
-            <Input
-              className="pl-10"
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            label: "In this queue",
+            value: stats.total,
+            icon: Inbox,
+            tone: "bg-blue-50 text-[#013f92]",
+          },
+          {
+            label: "Urgent",
+            value: stats.urgent,
+            icon: Zap,
+            tone: "bg-red-50 text-red-600",
+          },
+          {
+            label: "High priority",
+            value: stats.high,
+            icon: Clock3,
+            tone: "bg-amber-50 text-amber-700",
+          },
+          {
+            label: "Buyers / Suppliers",
+            value: `${stats.buyers} / ${stats.suppliers}`,
+            icon: Users,
+            tone: "bg-violet-50 text-violet-700",
+          },
+        ].map(({ label, value, icon: Icon, tone }) => (
+          <Card key={label} className="flex items-center gap-3 p-4">
+            <span className={cn("grid size-10 place-items-center rounded-xl", tone)}>
+              <Icon size={18} />
+            </span>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                {label}
+              </p>
+              <p className="mt-0.5 text-xl font-black tracking-tight text-[#0a275f]">
+                {value}
+              </p>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="mt-5 overflow-hidden border-[#e6edf5] shadow-[0_8px_30px_rgba(15,35,70,.04)]">
+        <div className="flex flex-col gap-3 border-b border-[#eef2f7] bg-[#fafbfd] p-4 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              size={16}
+            />
+            <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search name, email, company or conversation ID"
+              aria-label="Search queue"
+              className="h-10 w-full rounded-lg border border-[#e2eaf3] bg-white pl-10 pr-3 text-[13px] text-[#0a275f] outline-none transition placeholder:text-slate-400 focus:border-[#013f92]/35 focus:ring-2 focus:ring-[#013f92]/10"
             />
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <span className="hidden items-center gap-2 text-xs font-bold text-stus-muted sm:flex">
-              <Filter size={16} /> Filters
-            </span>
-            <select
-              value={type}
-              onChange={(event) => setType(event.target.value as "All" | UserType)}
-              className="h-11 rounded-xl border border-stus-border bg-white px-3 text-sm font-bold"
-              aria-label="Filter by customer type"
-            >
-              <option>All</option>
-              <option>Buyer</option>
-              <option>Supplier</option>
-            </select>
-            <select
-              value={priority}
-              onChange={(event) =>
-                setPriorityFilter(event.target.value as "All" | Priority)
-              }
-              className="h-11 rounded-xl border border-stus-border bg-white px-3 text-sm font-bold"
-              aria-label="Filter by priority"
-            >
-              <option>All</option>
-              <option>Urgent</option>
-              <option>High</option>
-              <option>Medium</option>
-              <option>Low</option>
-            </select>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg bg-white p-1 ring-1 ring-[#e2eaf3]">
+              {(["All", "Buyer", "Supplier"] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setType(item)}
+                  className={cn(
+                    "h-8 cursor-pointer rounded-md px-3 text-[11px] font-semibold transition",
+                    type === item
+                      ? "bg-[#0a275f] text-white"
+                      : "text-slate-500 hover:text-[#0a275f]",
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex rounded-lg bg-white p-1 ring-1 ring-[#e2eaf3]">
+              {(["All", "Urgent", "High", "Medium", "Low"] as const).map(
+                (item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setPriorityFilter(item)}
+                    className={cn(
+                      "h-8 cursor-pointer rounded-md px-2.5 text-[11px] font-semibold transition",
+                      priority === item
+                        ? "bg-[#0a275f] text-white"
+                        : "text-slate-500 hover:text-[#0a275f]",
+                    )}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
+            </div>
           </div>
         </div>
 
@@ -149,61 +288,136 @@ export function QueueView({
           />
         ) : (
           <>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[960px] border-collapse text-left">
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[1080px] border-collapse text-left">
                 <thead>
-                  <tr className="bg-slate-50/80 text-[11px] uppercase tracking-wider text-stus-muted">
-                    <th className="px-5 py-3 font-extrabold">Customer</th>
-                    <th className="px-5 py-3 font-extrabold">Request</th>
-                    <th className="px-5 py-3 font-extrabold">Waiting</th>
-                    <th className="px-5 py-3 font-extrabold">Priority</th>
-                    <th className="px-5 py-3 font-extrabold">Status</th>
-                    <th className="px-5 py-3 text-right font-extrabold">Actions</th>
+                  <tr className="border-b border-[#eef2f7] bg-white text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                    <th className="px-5 py-3.5">Customer</th>
+                    <th className="px-5 py-3.5">Request</th>
+                    <th className="px-5 py-3.5">Waiting</th>
+                    <th className="px-5 py-3.5">Priority</th>
+                    <th className="px-5 py-3.5">Status</th>
+                    {mode !== "requests" && (
+                      <th className="px-5 py-3.5">Owner</th>
+                    )}
+                    <th className="px-5 py-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stus-border">
+                <tbody>
                   {filtered.map((conversation) => (
-                    <tr key={conversation.id} className="transition hover:bg-blue-50/40">
+                    <tr
+                      key={conversation.id}
+                      className="group border-b border-[#f0f4f8] transition hover:bg-[#f7faff]"
+                    >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <Avatar name={conversation.customer.name} online={conversation.customer.online} />
-                          <div>
-                            <p className="text-sm font-extrabold">{conversation.customer.name}</p>
-                            <p className="mt-1 text-xs text-stus-muted">{conversation.customer.company} · {conversation.customer.type}</p>
+                          <span
+                            className={cn(
+                              "h-10 w-1 shrink-0 rounded-full",
+                              priorityBar(conversation.priority),
+                            )}
+                          />
+                          <Avatar
+                            name={conversation.customer.name}
+                            online={conversation.customer.online}
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-bold text-[#0a275f]">
+                              {conversation.customer.name}
+                            </p>
+                            <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                              {conversation.customer.company}
+                              <span className="mx-1">·</span>
+                              {conversation.customer.type}
+                            </p>
                           </div>
                         </div>
                       </td>
-                      <td className="max-w-[260px] px-5 py-4">
-                        <p className="truncate text-sm font-bold">{conversation.reason}</p>
-                        <p className="mt-1 text-xs text-stus-muted">{conversation.id}</p>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-stus-muted">
-                        <span className="flex items-center gap-2"><Clock3 size={15} /> {relativeTime(conversation.requestedAt)}</span>
+                      <td className="max-w-[280px] px-5 py-4">
+                        <p className="truncate text-[13px] font-semibold text-[#152a45]">
+                          {conversation.reason}
+                        </p>
+                        <p className="mt-1 font-mono text-[11px] text-slate-400">
+                          {conversation.id}
+                        </p>
                       </td>
                       <td className="px-5 py-4">
-                        <select
-                          value={conversation.priority}
-                          onChange={(event) =>
-                            setPriority(conversation.id, event.target.value as Priority)
-                          }
-                          className="rounded-lg border border-stus-border bg-white px-2 py-1.5 text-xs font-bold"
-                          aria-label={`Priority for ${conversation.id}`}
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold",
+                            conversation.priority === "Urgent"
+                              ? "bg-red-50 text-red-600"
+                              : "bg-[#f1f5f9] text-slate-500",
+                          )}
                         >
-                          <option>Urgent</option><option>High</option><option>Medium</option><option>Low</option>
-                        </select>
+                          <Clock3 size={13} />
+                          {relativeTime(conversation.requestedAt)}
+                        </span>
                       </td>
-                      <td className="px-5 py-4"><Badge tone="blue">{conversation.status}</Badge></td>
+                      <td className="px-5 py-4">
+                        <PrioritySelect
+                          id={conversation.id}
+                          value={conversation.priority}
+                          onChange={(value) =>
+                            setPriority(conversation.id, value)
+                          }
+                        />
+                      </td>
+                      <td className="px-5 py-4">
+                        <Badge
+                          tone={
+                            conversation.status === "Pending"
+                              ? "amber"
+                              : conversation.status === "Active"
+                                ? "green"
+                                : "blue"
+                          }
+                        >
+                          {conversation.status}
+                        </Badge>
+                      </td>
+                      {mode !== "requests" && (
+                        <td className="px-5 py-4">
+                          {conversation.assignedAgent ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar
+                                name={conversation.assignedAgent}
+                                size="sm"
+                              />
+                              <span className="text-[12px] font-semibold text-[#0a275f]">
+                                {conversation.assignedAgent}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[12px] font-medium text-slate-400">
+                              —
+                            </span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-2">
-                          <Button variant="secondary" size="sm" onClick={() => setPreview(conversation)}>
-                            <Eye size={15} /> Preview
-                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => setPreview(conversation)}
+                            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-[#e2eaf3] bg-white px-2.5 text-[11px] font-semibold text-[#0a275f] transition hover:bg-[#f7f9fc]"
+                          >
+                            <Eye size={14} /> Preview
+                          </button>
                           {mode === "requests" ? (
-                            <Button size="sm" onClick={() => accept(conversation.id)}>
-                              <Check size={15} /> Accept
-                            </Button>
+                            <button
+                              type="button"
+                              onClick={() => accept(conversation.id)}
+                              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-[#013f92] px-2.5 text-[11px] font-semibold text-white transition hover:bg-[#0254b3]"
+                            >
+                              <Check size={14} /> Accept
+                            </button>
                           ) : (
-                            <Link href={`/chats/live/${conversation.id}`}><Button size="sm">Open <ArrowRight size={15} /></Button></Link>
+                            <Link href={`/chats/live/${conversation.id}`}>
+                              <span className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-[#013f92] px-2.5 text-[11px] font-semibold text-white transition hover:bg-[#0254b3]">
+                                Open <ArrowRight size={14} />
+                              </span>
+                            </Link>
                           )}
                         </div>
                       </td>
@@ -212,27 +426,69 @@ export function QueueView({
                 </tbody>
               </table>
             </div>
-            <div className="divide-y divide-stus-border md:hidden">
+
+            <div className="divide-y divide-[#eef2f7] lg:hidden">
               {filtered.map((conversation) => (
                 <article key={conversation.id} className="p-4">
                   <div className="flex items-start gap-3">
-                    <Avatar name={conversation.customer.name} online={conversation.customer.online} />
+                    <span
+                      className={cn(
+                        "mt-1 h-10 w-1 shrink-0 rounded-full",
+                        priorityBar(conversation.priority),
+                      )}
+                    />
+                    <Avatar
+                      name={conversation.customer.name}
+                      online={conversation.customer.online}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-extrabold">{conversation.customer.name}</h3>
-                        <Badge tone={priorityTone(conversation.priority)}>{conversation.priority}</Badge>
+                        <h3 className="text-[13px] font-bold text-[#0a275f]">
+                          {conversation.customer.name}
+                        </h3>
+                        <Badge tone={priorityTone(conversation.priority)}>
+                          {conversation.priority}
+                        </Badge>
+                        <Badge tone="blue">{conversation.status}</Badge>
                       </div>
-                      <p className="mt-1 text-xs text-stus-muted">{conversation.customer.company} · {conversation.customer.type}</p>
-                      <p className="mt-3 text-sm font-bold">{conversation.reason}</p>
-                      <p className="mt-1 text-xs text-stus-muted">{conversation.id} · {formatTime(conversation.requestedAt)}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {conversation.customer.company} ·{" "}
+                        {conversation.customer.type}
+                      </p>
+                      <p className="mt-2.5 text-[13px] font-semibold text-[#152a45]">
+                        {conversation.reason}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {conversation.id} · {relativeTime(conversation.requestedAt)}
+                      </p>
                     </div>
                   </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="secondary" size="sm" className="flex-1" onClick={() => setPreview(conversation)}>Preview</Button>
+                  <div className="mt-3.5 flex gap-2 pl-4">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setPreview(conversation)}
+                    >
+                      Preview
+                    </Button>
                     {mode === "requests" ? (
-                      <Button size="sm" className="flex-1" onClick={() => accept(conversation.id)}>Accept</Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => accept(conversation.id)}
+                      >
+                        Accept
+                      </Button>
                     ) : (
-                      <Link href={`/chats/live/${conversation.id}`} className="flex-1"><Button size="sm" className="w-full">Open chat</Button></Link>
+                      <Link
+                        href={`/chats/live/${conversation.id}`}
+                        className="flex-1"
+                      >
+                        <Button size="sm" className="w-full">
+                          Open chat
+                        </Button>
+                      </Link>
                     )}
                   </div>
                 </article>
@@ -242,32 +498,93 @@ export function QueueView({
         )}
       </Card>
 
-      <Dialog open={Boolean(preview)} onClose={() => setPreview(null)} title="Conversation preview">
+      <Dialog
+        open={Boolean(preview)}
+        onClose={() => setPreview(null)}
+        title="Conversation preview"
+      >
         {preview && (
           <div>
-            <div className="flex items-center gap-3">
-              <Avatar name={preview.customer.name} size="lg" online={preview.customer.online} />
-              <div>
-                <h3 className="font-black">{preview.customer.name}</h3>
-                <p className="mt-1 text-sm text-stus-muted">{preview.customer.company} · {preview.customer.type}</p>
+            <div className="flex items-start gap-3 rounded-xl border border-[#e8eef5] bg-[#fafbfd] p-4">
+              <Avatar
+                name={preview.customer.name}
+                size="lg"
+                online={preview.customer.online}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-bold text-[#0a275f]">
+                    {preview.customer.name}
+                  </h3>
+                  <Badge tone={priorityTone(preview.priority)}>
+                    {preview.priority}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[12px] text-slate-500">
+                  {preview.customer.company} · {preview.customer.type}
+                </p>
+                <p className="mt-1 font-mono text-[11px] text-slate-400">
+                  {preview.id} · {formatTime(preview.requestedAt)}
+                </p>
               </div>
             </div>
-            <div className="mt-5 rounded-xl bg-blue-50/70 p-4">
-              <p className="text-xs font-extrabold uppercase tracking-wider text-primary">Request reason</p>
-              <p className="mt-2 text-sm font-bold">{preview.reason}</p>
-              <p className="mt-1 text-xs text-stus-muted">{preview.product}</p>
+
+            <div className="mt-4 rounded-xl border border-[#dce8f6] bg-[#f3f8ff] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#013f92]">
+                Current request
+              </p>
+              <p className="mt-1.5 text-[14px] font-semibold text-[#0a275f]">
+                {preview.reason}
+              </p>
+              <p className="mt-1 text-[12px] text-slate-500">{preview.product}</p>
             </div>
-            <div className="mt-5">
-              <h4 className="text-sm font-extrabold">Chatbot context</h4>
-              <div className="mt-2 space-y-2">
+
+            <div className="mt-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Bot size={14} className="text-[#013f92]" />
+                <h4 className="text-[12px] font-bold uppercase tracking-[0.08em] text-slate-400">
+                  Chatbot context
+                </h4>
+              </div>
+              <div className="space-y-2">
                 {preview.chatbotContext.map((item) => (
-                  <div key={item.question} className="rounded-xl border border-stus-border p-3">
-                    <p className="text-xs text-stus-muted">{item.question}</p>
-                    <p className="mt-1 text-sm font-bold">{item.answer}</p>
+                  <div
+                    key={item.question}
+                    className="rounded-lg border border-[#e8eef5] bg-white px-3 py-2.5"
+                  >
+                    <p className="text-[11px] text-slate-400">{item.question}</p>
+                    <p className="mt-1 text-[13px] font-semibold text-[#0a275f]">
+                      {item.answer}
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
+
+            {mode === "requests" && (
+              <div className="mt-4">
+                <p className="mb-2 text-[12px] font-semibold text-slate-500">
+                  Or transfer to another agent
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {agents.map((agent) => (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      onClick={() => {
+                        assign(preview.id, agent.name);
+                        setPreview(null);
+                      }}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#e2eaf3] bg-white py-1.5 pl-1.5 pr-3 text-[11px] font-semibold text-[#0a275f] hover:bg-[#f7f9fc]"
+                    >
+                      <Avatar name={agent.name} size="sm" />
+                      {agent.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 flex flex-wrap gap-2">
               {mode === "requests" && (
                 <>
@@ -290,12 +607,20 @@ export function QueueView({
                   </Button>
                 </>
               )}
-              {!preview.assignedAgent && (
-                <Button variant="secondary" onClick={() => assign(preview.id, "Ayesha Khan")}>
+              {!preview.assignedAgent && mode !== "requests" && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    assign(preview.id, "Ayesha Khan");
+                    setPreview(null);
+                  }}
+                >
                   <UserPlus size={16} /> Assign to me
                 </Button>
               )}
-              <Link href={`/chats/live/${preview.id}`}><Button variant="secondary">Open conversation</Button></Link>
+              <Link href={`/chats/live/${preview.id}`}>
+                <Button variant="secondary">Open conversation</Button>
+              </Link>
             </div>
           </div>
         )}

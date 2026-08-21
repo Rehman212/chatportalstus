@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Poppins } from "next/font/google";
+import { AppToaster } from "@/components/providers/app-toaster";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -28,7 +29,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={poppins.variable}>
-      <body className={`${poppins.className} min-h-dvh`}>{children}</body>
+      <body className={`${poppins.className} min-h-dvh`}>
+        {children}
+        <AppToaster />
+      </body>
     </html>
   );
 }

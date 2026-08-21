@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   Bell,
+  CheckCheck,
   ChevronDown,
   Clock3,
+  ExternalLink,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -19,10 +21,14 @@ import {
   Settings,
   UserCheck,
   Users,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { StusBrand } from "@/components/brand";
 import { Avatar, Badge, Button, Card, Skeleton } from "@/components/ui";
+import { playReceiveSound, unlockAudio } from "@/lib/sounds";
 import { cn } from "@/lib/utils";
 import { usePortalStore, useStoreHydrated } from "@/stores/portal-store";
 
@@ -152,12 +158,53 @@ function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
   const notifications = usePortalStore((state) => state.notifications);
   const availability = usePortalStore((state) => state.availability);
   const setAvailability = usePortalStore((state) => state.setAvailability);
+  const markAllNotificationsRead = usePortalStore(
+    (state) => state.markAllNotificationsRead,
+  );
+  const settings = usePortalStore((state) => state.settings);
+  const updateSettings = usePortalStore((state) => state.updateSettings);
   const signOut = usePortalStore((state) => state.signOut);
   const resetDemo = usePortalStore((state) => state.resetDemo);
   const [query, setQuery] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const lastToastId = useRef<string | null>(null);
+  const readyForToasts = useRef(false);
   const unread = notifications.filter((item) => !item.read).length;
+  const soundOn = settings.soundNotifications !== false;
+  const receiveSound = settings.receiveSound ?? "ping";
+
+  useEffect(() => {
+    const unlock = () => {
+      void unlockAudio();
+      window.removeEventListener("pointerdown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    return () => window.removeEventListener("pointerdown", unlock);
+  }, []);
+
+  useEffect(() => {
+    const newest = notifications[0];
+    if (!readyForToasts.current) {
+      readyForToasts.current = true;
+      if (newest) lastToastId.current = newest.id;
+      return;
+    }
+    if (!newest || newest.type !== "message") return;
+    if (lastToastId.current === newest.id) return;
+    lastToastId.current = newest.id;
+    playReceiveSound(soundOn, receiveSound);
+    toast.message("New message received", {
+      description: newest.detail,
+      action: newest.conversationId
+        ? {
+            label: "Open",
+            onClick: () => router.push(`/chats/live/${newest.conversationId}`),
+          }
+        : undefined,
+    });
+  }, [notifications, receiveSound, router, soundOn]);
+
   const results = useMemo(
     () =>
       query.trim().length > 1
@@ -263,29 +310,98 @@ function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
             )}
           </button>
           {notificationOpen && (
-            <Card className="absolute right-0 top-11 w-[min(340px,calc(100vw-2rem))] overflow-hidden shadow-xl">
-              <div className="flex items-center justify-between border-b border-stus-border p-4">
-                <span className="font-extrabold text-[#0a275f]">Notifications</span>
+            <Card className="absolute right-0 top-11 w-[min(360px,calc(100vw-2rem))] overflow-hidden shadow-xl">
+              <div className="border-b border-[#e8eef5] bg-[#fafbfd] px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[13px] font-bold text-[#0a275f]">
+                      Notifications
+                    </p>
+                    <p className="text-[10px] font-medium text-slate-400">
+                      {unread > 0 ? `${unread} unread` : "You're all caught up"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    <Link
+                      href="/notifications"
+                      aria-label="View all notifications"
+                      title="View all"
+                      onClick={() => setNotificationOpen(false)}
+                      className="grid size-8 place-items-center rounded-lg text-slate-500 transition hover:bg-white hover:text-[#013f92]"
+                    >
+                      <ExternalLink size={15} />
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label={soundOn ? "Mute sounds" : "Unmute sounds"}
+                      title={soundOn ? "Mute sound" : "Unmute sound"}
+                      onClick={() =>
+                        updateSettings({ soundNotifications: !soundOn })
+                      }
+                      className={cn(
+                        "grid size-8 cursor-pointer place-items-center rounded-lg transition",
+                        soundOn
+                          ? "text-slate-500 hover:bg-white hover:text-[#013f92]"
+                          : "bg-white text-[#013f92] ring-1 ring-[#dce8f6]",
+                      )}
+                    >
+                      {soundOn ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Mark all as read"
+                      title="Read all"
+                      onClick={() => markAllNotificationsRead()}
+                      className="grid size-8 cursor-pointer place-items-center rounded-lg text-slate-500 transition hover:bg-white hover:text-[#013f92]"
+                    >
+                      <CheckCheck size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="max-h-[320px] overflow-y-auto p-2">
+                {notifications.length === 0 ? (
+                  <p className="px-3 py-8 text-center text-[12px] text-slate-400">
+                    No notifications yet
+                  </p>
+                ) : (
+                  notifications.slice(0, 6).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="flex w-full cursor-pointer gap-2 rounded-xl p-3 text-left hover:bg-blue-50"
+                      onClick={() => {
+                        if (item.conversationId) {
+                          router.push(`/chats/live/${item.conversationId}`);
+                          setNotificationOpen(false);
+                        }
+                      }}
+                    >
+                      {!item.read ? (
+                        <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[#013f92]" />
+                      ) : (
+                        <span className="mt-1.5 size-2 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-[#0a275f]">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-stus-muted">
+                          {item.detail}
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+              <div className="border-t border-[#eef2f7] px-3 py-2">
                 <Link
                   href="/notifications"
-                  className="text-xs font-bold text-[#013f92]"
                   onClick={() => setNotificationOpen(false)}
+                  className="block rounded-lg py-2 text-center text-[12px] font-bold text-[#013f92] hover:bg-[#f3f8ff]"
                 >
-                  View all
+                  View all notifications
                 </Link>
-              </div>
-              <div className="p-2">
-                {notifications.slice(0, 3).map((item) => (
-                  <div key={item.id} className="rounded-xl p-3 hover:bg-blue-50">
-                    <div className="flex gap-2">
-                      {!item.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[#013f92]" />}
-                      <div>
-                        <p className="text-sm font-bold text-[#0a275f]">{item.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-stus-muted">{item.detail}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </Card>
           )}

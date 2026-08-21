@@ -89,6 +89,9 @@ export interface PortalSettings {
   language: string;
   timezone: string;
   soundNotifications: boolean;
+  sendSound: "whatsapp" | "pop" | "bubble" | "click" | "chime";
+  receiveSound: "ping" | "chime" | "soft" | "alert";
+  typingSound: "off" | "tick" | "soft" | "typewriter";
   desktopNotifications: boolean;
   emailDigest: boolean;
   autoAssignEnabled: boolean;
