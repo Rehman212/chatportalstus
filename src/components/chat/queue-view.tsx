@@ -95,7 +95,7 @@ export function QueueView({
   }[mode];
 
   return (
-    <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
+    <div className="w-full p-4 sm:p-5 lg:p-6">
       <PageHeader
         {...copy}
         action={<Badge tone="blue">{base.length} conversations</Badge>}

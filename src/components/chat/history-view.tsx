@@ -38,7 +38,7 @@ export function HistoryView() {
   ).length;
 
   return (
-    <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
+    <div className="w-full p-4 sm:p-5 lg:p-6">
       <PageHeader
         eyebrow="Conversation archive"
         title="Chat history"
@@ -125,7 +125,7 @@ export function HistoryDetail({ conversationId }: { conversationId: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
+    <div className="w-full p-4 sm:p-5 lg:p-6">
       <Link href="/chats/history" className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-primary">
         <ArrowLeft size={17} /> Back to history
       </Link>

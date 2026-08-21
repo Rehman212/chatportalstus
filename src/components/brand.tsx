@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export function StusBrand({
@@ -13,27 +14,28 @@ export function StusBrand({
       aria-label="STUS Support Portal"
       className="inline-flex items-center gap-3 rounded-xl"
     >
-      <span
-        className={`grid size-10 shrink-0 place-items-center rounded-xl text-base font-black tracking-tight ${
-          light
-            ? "bg-white text-primary"
-            : "bg-primary text-white shadow-[0_8px_22px_rgb(1_63_146/0.25)]"
-        }`}
-      >
-        S
+      <span className="relative size-10 shrink-0 overflow-hidden rounded-[10px] shadow-[0_6px_18px_rgba(1,63,146,.35)] ring-1 ring-white/20">
+        <Image
+          src="/assests/images/Logo_stus.webp"
+          alt="STUS"
+          width={40}
+          height={40}
+          className="size-full object-cover"
+          priority
+        />
       </span>
       {!compact && (
         <span className="leading-none">
           <span
-            className={`block text-xl font-black tracking-[-0.04em] ${
-              light ? "text-white" : "text-stus-dark"
+            className={`block text-[17px] font-extrabold tracking-[0.06em] ${
+              light ? "text-white" : "text-[#013f92]"
             }`}
           >
             STUS
           </span>
           <span
-            className={`mt-1 block text-[10px] font-bold uppercase tracking-[0.18em] ${
-              light ? "text-blue-100" : "text-stus-muted"
+            className={`mt-1.5 block text-[9px] font-semibold uppercase tracking-[0.18em] ${
+              light ? "text-[#c6dbf0]" : "text-stus-muted"
             }`}
           >
             Support Portal
