@@ -28,7 +28,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={poppins.variable}>
-      <body className="min-h-dvh">{children}</body>
+      <body className={`${poppins.className} min-h-dvh`}>{children}</body>
     </html>
   );
 }
