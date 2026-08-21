@@ -8,11 +8,32 @@ import type {
   Availability,
   Conversation,
   ConversationStatus,
+  MessageAttachment,
   PortalNotification,
+  PortalSettings,
   Priority,
 } from "@/types";
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+export const defaultSettings: PortalSettings = {
+  displayName: "Ayesha Khan",
+  email: "ayesha.khan@stus.pk",
+  roleLabel: "Super Admin",
+  language: "English",
+  timezone: "Asia/Karachi (PKT)",
+  soundNotifications: true,
+  desktopNotifications: true,
+  emailDigest: false,
+  autoAssignEnabled: true,
+  maxConcurrentChats: 5,
+  defaultPriority: "Medium",
+  slaFirstResponseMinutes: 5,
+  slaResolutionHours: 24,
+  chatSignature: "Best regards,\nAyesha Khan · STUS Support",
+  showTypingIndicator: true,
+  enterToSend: true,
+};
 
 interface PortalState {
   authenticated: boolean;
@@ -20,6 +41,7 @@ interface PortalState {
   availability: Availability;
   conversations: Conversation[];
   notifications: PortalNotification[];
+  settings: PortalSettings;
   signIn: (email: string) => void;
   signOut: () => void;
   setAvailability: (availability: Availability) => void;
@@ -28,7 +50,7 @@ interface PortalState {
   assignConversation: (id: string, agentName: string) => void;
   setPriority: (id: string, priority: Priority) => void;
   setStatus: (id: string, status: ConversationStatus) => void;
-  sendMessage: (id: string, body: string) => void;
+  sendMessage: (id: string, body: string, attachment?: MessageAttachment) => void;
   retryMessage: (conversationId: string, messageId: string) => void;
   addNote: (id: string, body: string) => void;
   closeConversation: (id: string, note?: string) => void;
@@ -36,6 +58,7 @@ interface PortalState {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   removeNotification: (id: string) => void;
+  updateSettings: (patch: Partial<PortalSettings>) => void;
   resetDemo: () => void;
 }
 
@@ -53,6 +76,7 @@ export const usePortalStore = create<PortalState>()(
       availability: "Online",
       conversations: clone(conversations),
       notifications: clone(notifications),
+      settings: clone(defaultSettings),
       signIn: () => set({ authenticated: true }),
       signOut: () => set({ authenticated: false }),
       setAvailability: (availability) => set({ availability }),
@@ -92,8 +116,9 @@ export const usePortalStore = create<PortalState>()(
               ...conversation,
               assignedAgent: agentName,
               status:
-                conversation.status === "Pending"
-                  ? "Assigned"
+                conversation.status === "Pending" ||
+                conversation.status === "Assigned"
+                  ? "Active"
                   : conversation.status,
               updatedAt: new Date().toISOString(),
             }),
@@ -119,7 +144,7 @@ export const usePortalStore = create<PortalState>()(
             }),
           ),
         })),
-      sendMessage: (id, body) => {
+      sendMessage: (id, body, attachment) => {
         const messageId = `local-${Date.now()}`;
         set((state) => ({
           conversations: updateConversation(
@@ -139,9 +164,10 @@ export const usePortalStore = create<PortalState>()(
                   conversationId: id,
                   sender: state.userName,
                   kind: "agent",
-                  body,
+                  body: body || (attachment?.type === "voice" ? "Voice message" : attachment?.name || ""),
                   createdAt: new Date().toISOString(),
                   delivery: "sending",
+                  attachment,
                 },
               ],
             }),
@@ -274,11 +300,17 @@ export const usePortalStore = create<PortalState>()(
             (notification) => notification.id !== id,
           ),
         })),
+      updateSettings: (patch) =>
+        set((state) => ({
+          settings: { ...state.settings, ...patch },
+          userName: patch.displayName ?? state.userName,
+        })),
       resetDemo: () =>
         set({
           availability: agents[0].availability,
           conversations: clone(conversations),
           notifications: clone(notifications),
+          settings: clone(defaultSettings),
         }),
     }),
     {
@@ -288,6 +320,8 @@ export const usePortalStore = create<PortalState>()(
         availability: state.availability,
         conversations: state.conversations,
         notifications: state.notifications,
+        settings: state.settings,
+        userName: state.userName,
       }),
     },
   ),

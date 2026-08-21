@@ -34,6 +34,8 @@ const navItems = [
   { href: "/chats/unassigned", label: "Unassigned", icon: Users },
   { href: "/chats/history", label: "History", icon: Clock3 },
   { href: "/notifications", label: "Notifications", icon: Bell, unread: true },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 function NavTooltip({ label, show }: { label: string; show: boolean }) {
@@ -124,25 +126,6 @@ function Sidebar({
             </Link>
           );
         })}
-
-        <div className="my-3 border-t border-white/10" />
-
-        {[
-          { label: "Analytics", icon: BarChart3 },
-          { label: "Settings", icon: Settings },
-        ].map(({ label, icon: Icon }) => (
-          <span
-            key={label}
-            className={cn(
-              "group/nav relative flex h-11 cursor-not-allowed items-center rounded-xl text-[13px] font-semibold text-white/30",
-              expanded ? "gap-3 px-3" : "justify-center",
-            )}
-          >
-            <Icon size={18} className="shrink-0" />
-            {expanded && label}
-            <NavTooltip label={`${label} · Coming soon`} show={!expanded} />
-          </span>
-        ))}
       </nav>
 
       {!mobile && (
@@ -397,7 +380,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
       )}
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onOpenMenu={() => setMenuOpen(true)} />
-        <main className="min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0">{children}</main>
+        <main className="relative min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0">{children}</main>
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[#e4ecf4] bg-white px-2 py-2 lg:hidden">
         {[

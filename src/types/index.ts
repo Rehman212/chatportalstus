@@ -28,6 +28,14 @@ export interface Customer {
   online: boolean;
 }
 
+export interface MessageAttachment {
+  name: string;
+  size: string;
+  type?: "file" | "image" | "voice";
+  url?: string;
+  durationSec?: number;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -36,7 +44,7 @@ export interface Message {
   body: string;
   createdAt: string;
   delivery?: "sending" | "sent" | "failed";
-  attachment?: { name: string; size: string };
+  attachment?: MessageAttachment;
 }
 
 export interface Conversation {
@@ -72,4 +80,23 @@ export interface PortalNotification {
   conversationId?: string;
   createdAt: string;
   read: boolean;
+}
+
+export interface PortalSettings {
+  displayName: string;
+  email: string;
+  roleLabel: string;
+  language: string;
+  timezone: string;
+  soundNotifications: boolean;
+  desktopNotifications: boolean;
+  emailDigest: boolean;
+  autoAssignEnabled: boolean;
+  maxConcurrentChats: number;
+  defaultPriority: Priority;
+  slaFirstResponseMinutes: number;
+  slaResolutionHours: number;
+  chatSignature: string;
+  showTypingIndicator: boolean;
+  enterToSend: boolean;
 }
